@@ -1,26 +1,27 @@
+import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import type { NextRequest, NextResponse } from "next/server";
 
-/**
- * ? middleware에서만 사용 (Request/Response 기반)
- * - Next.js cookies() API 버전 차이를 피함
- * - 세션 갱신은 middleware가 담당
- */
-export function createSupabaseMiddlewareClient(req: NextRequest, res: NextResponse) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            res.cookies.set(name, value, options);
-          });
-        },
+// ✅ 서버 컴포넌트/라우트에서 쓰는 표준 서버 클라이언트
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+  return createServerClient(url, anon, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
       },
-    }
-  );
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // Server Component에서는 set이 막힐 수 있어 무시
+        }
+      },
+    },
+  });
 }
