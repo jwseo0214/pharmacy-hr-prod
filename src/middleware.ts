@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-function hasSupabaseSessionCookie(req: NextRequest) {
-  const all = req.cookies.getAll();
-  return all.some((c) => c.name.startsWith("sb-") && c.name.includes("auth-token"));
+// Supabase 세션 쿠키는 버전에 따라 이름이 다를 수 있어 넓게 체크
+function hasSupabaseSession(req: NextRequest) {
+  const cookies = req.cookies.getAll();
+  // 보통: sb-<project-ref>-auth-token
+  return cookies.some((c) => c.name.startsWith("sb-") && c.name.includes("auth-token"));
 }
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // /login 은 절대 middleware에서 막지 않음
+  // ✅ /login 은 절대 middleware에서 리다이렉트하면 안 됨
   if (pathname === "/login") return NextResponse.next();
 
-  const authed = hasSupabaseSessionCookie(req);
-  if (!authed) {
+  // 보호 경로에서만 체크
+  if (!hasSupabaseSession(req)) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
@@ -23,7 +25,7 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-// 보호가 필요한 경로만 적용 (루프 방지 핵심)
+// ✅ "전체 사이트"가 아니라 보호 구역만 적용 (여기가 루프 끊는 핵심)
 export const config = {
   matcher: [
     "/dashboard/:path*",
